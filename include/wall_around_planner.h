@@ -4,7 +4,7 @@
 #include <fstream>
 #include "configuration.h"
 
-namespace WallAround
+namespace wallaround
 {
     class WallAround
     {

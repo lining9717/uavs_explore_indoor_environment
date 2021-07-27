@@ -24,7 +24,7 @@ simulation::Simulation::Simulation()
     for (int i = 0; i < NUM_OF_UAV; ++i)
     {
         uavs[i] = std::make_shared<UAV::UAV>(init_positons[i], i);
-        wall_around_planners[i] = std::make_shared<WallAround::WallAround>();
+        wall_around_planners[i] = std::make_shared<wallaround::WallAround>();
         Node start_position{getColFromX(int(init_positons[i].x)), getRowFromY(int(init_positons[i].y))};
         wall_around_planners[i]->init(start_position, map_file_path);
         wall_around_planners[i]->setMainDirection(init_direction[i]);

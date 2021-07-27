@@ -239,7 +239,7 @@ void UAV::UAV::moveUAV(float distance, ros::Rate &loop_rate, int power)
     int ticks = int(distance / m_speed_ * m_rate_);
     for (int i = 0; i < ticks; ++i)
     {
-        // powerConsumption(power);
+        powerConsumption(power);
         ros::spinOnce();
         m_cmd_vel_publisher_.publish(m_msg_);
         loop_rate.sleep();
@@ -486,14 +486,12 @@ void UAV::UAV::driveByDirection(Direction direction, ros::Rate &loop_rate)
  */
 void UAV::UAV::goToBoundary(const WallAroundPlannerPtr &planner, const Direction &direction, ros::Rate &loop_rate)
 {
-    // printf("********************************\n");
     int distance = 0;
     while (!planner->isObstacle(direction))
     {
         planner->move(direction);
         ++distance;
     }
-    // printf("Distance: %d\n", distance);
     if (direction == FRONT)
         m_uav_coordinate_position_.x += distance;
     else if (direction == BACK)
@@ -504,8 +502,6 @@ void UAV::UAV::goToBoundary(const WallAroundPlannerPtr &planner, const Direction
         m_uav_coordinate_position_.y += distance;
     while (ros::ok() and distance > 0)
     {
-        // ros::spinOnce();
-        // driveByDirection(direction, loop_rate);
         if (direction == FRONT)
         {
             m_msg_.linear.x = m_speed_;
@@ -532,14 +528,10 @@ void UAV::UAV::goToBoundary(const WallAroundPlannerPtr &planner, const Direction
         }
         moveUAV(1.0, loop_rate, 1);
         hoverUAV(loop_rate);
-        // printf("[UAV%d] real position(%f, %f)\n", m_id_, m_uav_real_position_.x, m_uav_real_position_.y);
-        // printf("[UAV%d] coordinate position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
         --distance;
     }
-    // printf("********************************\n");
     fixUAVAngle(loop_rate);
     hoverUAV(loop_rate);
-    // fixUAVRoute(direction);
 }
 
 void prinDirection(Direction d)
@@ -599,11 +591,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
             }
             if (m_entrance_position_publisher_.getNumSubscribers() != 0)
                 publishEntrancePosition();
-            // printf("[UAV%d] real position(%f, %f)\n", m_id_, m_uav_real_position_.x, m_uav_real_position_.y);
-            // printf("[UAV%d] coordinate position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
             Direction next_direction = planner->getNextTowardDirection(); //获取下一次前进的方向
-            // printf("[UAV%d] Next direction: ", m_id_);
-            // prinDirection(next_direction);
 
             fixUAVRoute(loop_rate);
             calcuNextPosition(next_direction);

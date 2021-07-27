@@ -51,7 +51,7 @@ Direction getOppositeDirection(Direction d)
     }
 }
 
-WallAround::WallAround::WallAround()
+wallaround::WallAround::WallAround()
 {
     m_main_direction_ = NONE;
     m_next_direction_ = NONE;
@@ -62,14 +62,14 @@ WallAround::WallAround::WallAround()
     m_height_ = 0;
 }
 
-WallAround::WallAround::~WallAround() {}
+wallaround::WallAround::~WallAround() {}
 
-std::string WallAround::WallAround::getPlannerName()
+std::string wallaround::WallAround::getPlannerName()
 {
     return "WallAroundPlanner";
 }
 
-void WallAround::WallAround::init(const Node &position, const std::string &map)
+void wallaround::WallAround::init(const Node &position, const std::string &map)
 {
     std::ifstream map_file(map);
     std::string input_line;
@@ -83,12 +83,12 @@ void WallAround::WallAround::init(const Node &position, const std::string &map)
     std::cout << "Wall Around Position(" << position.first << "," << position.second << ")" << std::endl;
 }
 
-Direction WallAround::WallAround::getMainDirection()
+Direction wallaround::WallAround::getMainDirection()
 {
     return m_main_direction_;
 }
 
-void WallAround::WallAround::setMainDirection(Direction md)
+void wallaround::WallAround::setMainDirection(Direction md)
 {
     m_main_direction_ = md;
     m_next_direction_ = getNextDirection(m_main_direction_);
@@ -96,32 +96,32 @@ void WallAround::WallAround::setMainDirection(Direction md)
     m_opposite_direction_ = getOppositeDirection(m_main_direction_);
 }
 
-int WallAround::WallAround::getX() const
+int wallaround::WallAround::getX() const
 {
     return m_position_.first;
 }
 
-int WallAround::WallAround::getY() const
+int wallaround::WallAround::getY() const
 {
     return m_position_.second;
 }
 
-void WallAround::WallAround::setX(int x)
+void wallaround::WallAround::setX(int x)
 {
     m_position_.first = x;
 }
 
-void WallAround::WallAround::setY(int y)
+void wallaround::WallAround::setY(int y)
 {
     m_position_.second = y;
 }
 
-char WallAround::WallAround::getMapValue(int x, int y) const
+char wallaround::WallAround::getMapValue(int x, int y) const
 {
     return m_map_[y][x];
 }
 
-bool WallAround::WallAround::isObstacle(Direction direction)
+bool wallaround::WallAround::isObstacle(Direction direction)
 {
     switch (direction)
     {
@@ -138,7 +138,7 @@ bool WallAround::WallAround::isObstacle(Direction direction)
     }
 }
 
-void WallAround::WallAround::move(Direction direction)
+void wallaround::WallAround::move(Direction direction)
 {
     if (direction == FRONT)
         setX(getX() + 1);
@@ -148,14 +148,10 @@ void WallAround::WallAround::move(Direction direction)
         setY(getY() - 1);
     else
         setY(getY() + 1);
-    // printf("WallAround position: (%d, %d)\n", getX(), getY());
 }
-Direction WallAround::WallAround::getNextTowardDirection()
+
+Direction wallaround::WallAround::getNextTowardDirection()
 {
-    // if (isObstacle(m_main_direction_) and !isObstacle(m_next_direction_))
-    // {
-    // }
-    // else
     if (!isObstacle(m_main_direction_))
     {
         m_next_direction_ = m_main_direction_;
@@ -185,7 +181,7 @@ Direction WallAround::WallAround::getNextTowardDirection()
     return m_next_direction_;
 }
 
-void WallAround::WallAround::printDirections()
+void wallaround::WallAround::printDirections()
 {
     switch (m_main_direction_)
     {

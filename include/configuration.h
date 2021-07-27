@@ -5,6 +5,8 @@
 const char OBSTACLE = '#';
 const char FREESPACE = '.';
 const float UNDEFINED_POSITION = 0xFFF5;
+const int GETGOAL = 0xFFF6;
+
 const Position UNDEFINED{UNDEFINED_POSITION, UNDEFINED_POSITION, UNDEFINED_POSITION};
 
 //网格地图路径

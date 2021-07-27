@@ -12,7 +12,7 @@
 #include <tf/transform_datatypes.h>
 
 typedef int UAVState;
-typedef std::shared_ptr<WallAround::WallAround> WallAroundPlannerPtr;
+typedef std::shared_ptr<wallaround::WallAround> WallAroundPlannerPtr;
 
 enum : UAVState
 {
