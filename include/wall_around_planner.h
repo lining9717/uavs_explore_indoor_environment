@@ -17,10 +17,7 @@ namespace wallaround
         std::vector<std::string> m_map_;
         int m_width_;
         int m_height_;
-        int getX() const;
-        int getY() const;
-        void setX(int x);
-        void setY(int y);
+        
         char getMapValue(int x, int y) const;
         
 
@@ -36,6 +33,10 @@ namespace wallaround
         void setMainDirection(Direction md);
         void calcuDirections();
         void move(Direction direction);
+        int getX() const;
+        int getY() const;
+        void setX(int x);
+        void setY(int y);
     };
 
 };

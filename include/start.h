@@ -60,8 +60,14 @@ namespace simulation
         // 从中心原点转化为左上角原点
         int getRowFromY(int y);
 
+        // 从左上角转化为中心原点
+        int getXFromCol(int col);
+
+        // 从左上角转化为中心原点
+        int getYFromRow(int row);
+
         // 获取下一个可得到的tracking uav id
-        int getNextTrackingUAVId();
+        int getNextTrackingUAVId(int pre_uav_id);
 
         void trackingUAVCallback();
 

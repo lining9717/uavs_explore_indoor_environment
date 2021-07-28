@@ -37,5 +37,5 @@ const int NUM_OF_UAV = 2;
 // 停止点
 const Position end_position{21, -1, 0};
 
-const int BATTERY_THRESHOLD = 50;
-const int FULL_BATTERY = 60;
+const int BATTERY_THRESHOLD = 30;
+const int FULL_BATTERY = 100;

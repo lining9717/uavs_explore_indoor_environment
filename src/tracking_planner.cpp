@@ -18,13 +18,13 @@ void trackingplanner::TrackingPlanner::init(const Node &nstart, const Node &ngoa
     x_bias = width / 2;
     y_bias = height / 2;
 
-    std::cout << "Tracking-D*lite Map: width=" << width << ", height=" << height << std::endl;
+    // std::cout << "Tracking-D*lite Map: width=" << width << ", height=" << height << std::endl;
     graph.resize(width * height);
     map_size = width * height;
     start = width * nstart.second + nstart.first;
     goal = width * ngoal.second + ngoal.first;
-    std::cout << "Tracking-D*lite start: (" << start % width << ", " << start / width << ")" << std::endl;
-    std::cout << "Tracking-D*lite goal: (" << goal % width << ", " << goal / width << ")" << std::endl;
+    // std::cout << "Tracking-D*lite start: (" << start % width << ", " << start / width << ")" << std::endl;
+    // std::cout << "Tracking-D*lite goal: (" << goal % width << ", " << goal / width << ")" << std::endl;
 
     for (int i = 0; i < height; ++i)
     {
@@ -239,45 +239,21 @@ int trackingplanner::TrackingPlanner::sum(std::vector<int> &v)
     return summ;
 }
 
-Direction trackingplanner::TrackingPlanner::getDirection()
-{
-    int last_x = last_start % width;
-    int last_y = last_start / width;
-    int curr_x = start % width;
-    int curr_y = start / width;
 
-    if (last_x == curr_x)
-    {
-        if (curr_y < last_y)
-            return RIGHT;
-        else if (curr_y > last_y)
-            return LEFT;
-    }
-    if (last_y == curr_y)
-    {
-        if (curr_x < last_x)
-            return BACK;
-        else if (curr_x > last_x)
-            return FRONT;
-    }
-    return NONE;
-}
-
-Direction trackingplanner::TrackingPlanner::getNextTowardDirection()
+std::pair<int, int> trackingplanner::TrackingPlanner::getNextPosition()
 {
     if (start == goal)
-        return GETGOAL;
+        return {GETGOAL, GETGOAL};
     if (old_goal == goal and !path.empty())
     {
-        last_start = start;
         start = *(path.rbegin() + 1);
         path.pop_back();
-        return getDirection();
+        return {getXFromCol(start % width), getYFromRow(start / width)};
     }
     if (computePath() == false)
     {
-        std::cout << "No Path!" << std::endl;
-        return NOPATH;
+        std::cout << "Get target!" << std::endl;
+        return {GETGOAL, GETGOAL};
     }
 
     //获取找到的路径
@@ -289,14 +265,14 @@ Direction trackingplanner::TrackingPlanner::getNextTowardDirection()
     if (start == goal)
     {
         std::cout << "Get target!" << std::endl;
-        return GETGOAL;
+        return {GETGOAL, GETGOAL};
     }
     updateFvalues(OPEN);
     step1();
     step2();
     step3();
     step4();
-    return getDirection();
+    return {getXFromCol(start % width), getYFromRow(start / width)};
 }
 
 void trackingplanner::TrackingPlanner::updateNextTarget(int x, int y)
@@ -307,6 +283,15 @@ void trackingplanner::TrackingPlanner::updateNextTarget(int x, int y)
 std::string trackingplanner::TrackingPlanner::getPlannerName()
 {
     return "Tracking-D*Lite";
+}
+
+int trackingplanner::TrackingPlanner::getXFromCol(int col)
+{
+    return col - x_bias;
+}
+int trackingplanner::TrackingPlanner::getYFromRow(int row)
+{
+    return y_bias - row;
 }
 
 int trackingplanner::TrackingPlanner::getColFromCoordinate(int x)

@@ -18,7 +18,6 @@ typedef int UAVState;
 typedef std::shared_ptr<wallaround::WallAround> WallAroundPlannerPtr;
 typedef std::shared_ptr<trackingplanner::TrackingPlanner> TrackingPlannerPtr;
 
-
 enum : UAVState
 {
     TRACKING = 0xFFF5,
@@ -90,8 +89,6 @@ namespace UAV
         // 是否有需要追逐的目标
         bool m_is_catch_;
 
-        
-
     public:
         //无人机当前运行状态
         int m_uav_state;
@@ -109,6 +106,7 @@ namespace UAV
 
         Position getUAVRealPosition() const;
         Position getUAVCoordinatePosition() const;
+        void setUAVCoordinatePosition(int x, int y);
         void positionCallback(const geometry_msgs::PoseStamped::ConstPtr &msg);
         void entrancePositionCallback(const uavs_explore_indoor_environment::EntrancePosition::ConstPtr &entrance_position_msg);
         void publishEntrancePosition();
@@ -117,10 +115,10 @@ namespace UAV
         int getID();
 
         void calcuNextPosition(Direction d);
-        Position getNextPsotion(Direction d);
 
         Position getEntranceStopPosition();
         void setEntranceStopPosition(const Position &position);
+        Direction caculateDirection(const std::pair<int, int> &next_position);
 
         void waitForSubscribles();
 
@@ -132,6 +130,7 @@ namespace UAV
         // 修正无人机路线和旋转角度
         void fixUAVRoute(ros::Rate &loop_rate);
         void fixUAVAngle(ros::Rate &loop_rate);
+        void fixTransitionPosition();
 
         void driveByDirection(Direction direction, ros::Rate &loop_rate);
         void goToBoundary(const WallAroundPlannerPtr &planner, const Direction &direction, ros::Rate &loop_rate);
@@ -155,7 +154,6 @@ namespace UAV
 
         //是否在飞行
         bool isFlying();
-        
     };
 };
 typedef std::shared_ptr<UAV::UAV> UAVPtr;

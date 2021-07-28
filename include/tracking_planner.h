@@ -77,7 +77,8 @@ namespace trackingplanner
         //最后找到的路径
         std::vector<int> path;
 
-
+        int getXFromCol(int col);
+        int getYFromRow(int row);
         int getColFromCoordinate(int x);
         int getRowFromCoordinate(int y);
 
@@ -118,8 +119,7 @@ namespace trackingplanner
 
         void init(const Node &nstart, const Node &ngoal, const std::string &map_file_path);
 
-        Direction getDirection();
-        Direction getNextTowardDirection();
+        std::pair<int, int> getNextPosition();
         void updateNextTarget(int x, int y);
 
         int sum(std::vector<int> &v);

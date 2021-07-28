@@ -115,6 +115,12 @@ void UAV::UAV::setTarget(const Position &position)
     m_is_catch_ = true;
 }
 
+void UAV::UAV::setUAVCoordinatePosition(int x, int y)
+{
+    m_uav_coordinate_position_.x = x;
+    m_uav_coordinate_position_.y = y;
+}
+
 /**
  * @brief 停止无人机
  * 
@@ -240,7 +246,6 @@ void UAV::UAV::disableMotors()
         throw UAVException(ss.str().c_str());
     }
 }
-
 
 void UAV::UAV::setStopPosition(const Position &stop_position)
 {
@@ -398,7 +403,7 @@ void UAV::UAV::fixUAVAngle(ros::Rate &loop_rate)
 
 void UAV::UAV::fixUAVRoute(ros::Rate &loop_rate)
 {
-    if (m_uav_real_position_.isClose(m_uav_coordinate_position_, 0.5))
+    if (m_uav_real_position_.isClose(m_uav_coordinate_position_, 0.3))
         return;
     // x方向的修正
     while (ros::ok() and fabs(m_uav_real_position_.x - m_uav_coordinate_position_.x) > 0.1)
@@ -427,6 +432,12 @@ void UAV::UAV::fixUAVRoute(ros::Rate &loop_rate)
     }
 }
 
+void UAV::UAV::fixTransitionPosition()
+{
+    ros::Rate loop_rate(m_rate_);
+    fixUAVRoute(loop_rate);
+}
+
 /**
  * @brief 通过方向计算下一次移动坐标
  * 
@@ -444,26 +455,6 @@ void UAV::UAV::calcuNextPosition(Direction d)
     else
         m_uav_coordinate_position_.y -= 1;
     // printf("[UAV%d] Next position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
-}
-
-/**
- * @brief 通过方向计算下一次移动坐标
- * 
- * @param d 
- * @return Position 
- */
-Position UAV::UAV::getNextPsotion(Direction d)
-{
-    Position temp = m_uav_coordinate_position_;
-    if (d == FRONT)
-        temp.x += 1;
-    else if (d == BACK)
-        temp.x -= 1;
-    else if (d == LEFT)
-        temp.y += 1;
-    else
-        temp.y -= 1;
-    return temp;
 }
 
 void UAV::UAV::driveByDirection(Direction direction, ros::Rate &loop_rate)
@@ -573,6 +564,26 @@ void prinDirection(Direction d)
     }
 }
 
+Direction UAV::UAV::caculateDirection(const std::pair<int, int> &next_position)
+{
+    if (next_position.first == (int)m_uav_coordinate_position_.x)
+    {
+        if (next_position.second > m_uav_coordinate_position_.y)
+            return LEFT;
+        if (next_position.second < m_uav_coordinate_position_.y)
+            return RIGHT;
+    }
+
+    if (next_position.second == (int)m_uav_coordinate_position_.y)
+    {
+        if (next_position.first > m_uav_coordinate_position_.x)
+            return FRONT;
+        if (next_position.first < m_uav_coordinate_position_.x)
+            return BACK;
+    }
+    return NONE;
+}
+
 /**
  * @brief 用于绕边飞行
  * 
@@ -655,40 +666,42 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
         while (ros::ok())
         {
             ros::spinOnce(); //获取无人机位置
+            std::pair<int, int> next_x_y = planner->getNextPosition();
             moving_target = pre_uav->getUAVCoordinatePosition();
-            printf("[UAV%d] get target UAV%d position(%d, %d)\n", m_id_, pre_uav->getID(), (int)moving_target.x, (int)moving_target.y);
-
-            planner->updateNextTarget(int(moving_target.x), int(moving_target.y));
-            Direction next_direction = planner->getNextTowardDirection(); //获取下一次前进的方向
-
-            if (next_direction == NOPATH)
-                throw UAVException("No path");
-            if (next_direction == GETGOAL)
-            {
-                printf("[UAV%d] Get the goal!\n", m_id_);
-                pre_uav->stop();
-                return true;
-            }
-            Position next_position = getNextPsotion(next_direction);
+            // printf("[UAV%d] get target UAV%d position(%d, %d)\n", m_id_, pre_uav->getID(), (int)moving_target.x, (int)moving_target.y);
             if (pre_uav->isFlying() and
-                fabs(next_position.x - moving_target.x) + fabs(next_position.y - moving_target.y) < 2)
+                fabs(next_x_y.first - moving_target.x) + fabs(next_x_y.second - moving_target.y) <= 2)
             {
                 printf("[UAV%d] stoped by UAV%d\n", pre_uav->getID(), m_id_);
                 pre_uav->stop();
+            }
+            if (next_x_y.first == GETGOAL)
+            {
                 return true;
             }
-            printf("[UAV%d] next tracking position(%d, %d)\n", m_id_, int(next_position.x), int(next_position.y));
+            if (next_x_y.first == NOPATH)
+                throw UAVException("No path");
+            printf("[UAV%d] next tracking position(%d, %d)\n", m_id_, int(next_x_y.first), int(next_x_y.second));
+
+            Direction next_direction = caculateDirection(next_x_y);
+            if (next_direction == NONE)
+                throw UAVException("Next direction caculation error.");
+
             fixUAVRoute(loop_rate);
-            m_uav_coordinate_position_ = next_position;
+
             driveByDirection(next_direction, loop_rate);
             fixUAVAngle(loop_rate);
             hoverUAV(loop_rate);
+            m_uav_coordinate_position_.x = next_x_y.first;
+            m_uav_coordinate_position_.y = next_x_y.second;
 
             if (m_battery_ <= 0)
             {
                 printf("[UAV%d] Tracking stop by battery empty\n", m_id_);
                 break;
             }
+            moving_target = pre_uav->getUAVCoordinatePosition();
+            planner->updateNextTarget((int)moving_target.x, (int)moving_target.y);
         }
         stop();
     }

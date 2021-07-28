@@ -1,7 +1,7 @@
 #include "start.h"
 
-
 std::mutex tracking_uav_index_mutex;
+int sequence_take_off = 1;
 
 // 获取被追踪无人机uav id
 int getPreUAVId(TheardSafe *thread_safe)
@@ -85,6 +85,18 @@ int simulation::Simulation::getRowFromY(int y)
     return y_bias - y;
 }
 
+// 从左上角转化为中心原点
+int simulation::Simulation::getXFromCol(int col)
+{
+    return col - x_bias;
+}
+
+// 从左上角转化为中心原点
+int simulation::Simulation::getYFromRow(int row)
+{
+    return y_bias - row;
+}
+
 void simulation::Simulation::startUAVCallback(int id)
 {
     printf("Start [UAV%d]\n", id);
@@ -94,31 +106,48 @@ void simulation::Simulation::startUAVCallback(int id)
     curr_uav->wallAround(wall_around_planners[id]);
 }
 
-int simulation::Simulation::getNextTrackingUAVId()
+int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
 {
     if (tracking_uavs_index > uavs_num)
         return -1;
+    int last_sequence_take_off = sequence_take_off;
     std::lock_guard<std::mutex> lock(tracking_uav_index_mutex);
     int ret = tracking_uavs_index;
     ++tracking_uavs_index;
+    if (last_sequence_take_off != sequence_take_off)
+        sleep(3);
+    ++sequence_take_off;
     return ret;
 }
 
 void simulation::Simulation::trackingUAVCallback()
 {
     int pre_uav_id = getPreUAVId(&m_thread_safe);
-    int curr_uav_id = getNextTrackingUAVId();
+    int curr_uav_id = getNextTrackingUAVId(pre_uav_id);
 
+    printf("UAV%d catch UAV%d\n", curr_uav_id, pre_uav_id);
     UAVPtr curr_uav = uavs[curr_uav_id];
     curr_uav->setEntranceStopPosition(uavs[pre_uav_id]->getEntranceStopPosition());
     curr_uav->setStopPosition(end_position);
+
     Node start_position{getColFromX(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].x)),
                         getRowFromY(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].y))};
+    Position pre_uav_position = uavs[pre_uav_id]->getUAVCoordinatePosition();
+    Node goal_position{getColFromX(int(pre_uav_position.x)), getRowFromY(int(pre_uav_position.y))};
+
     TrackingPlannerPtr track_planner = std::make_shared<trackingplanner::TrackingPlanner>();
-    track_planner->init(start_position, start_position, map_file_path);
+    track_planner->init(start_position, goal_position, map_file_path);
     curr_uav->initForDrive();
+
     if (!curr_uav->track(track_planner, uavs[pre_uav_id]))
         return;
+    curr_uav->setUAVCoordinatePosition(getXFromCol(wall_around_planners[pre_uav_id]->getX()),
+                                       getYFromRow(wall_around_planners[pre_uav_id]->getY()));
+    curr_uav->fixTransitionPosition();
+    printf("[UAV%d] curr_uav_coordinate(%d, %d), pre_uav_real(%f,%f), WallAround(%d,%d)\n", curr_uav_id,
+           (int)curr_uav->getUAVCoordinatePosition().x, (int)curr_uav->getUAVCoordinatePosition().y,
+           curr_uav->getUAVRealPosition().x, curr_uav->getUAVRealPosition().y,
+           getXFromCol(wall_around_planners[pre_uav_id]->getX()), getYFromRow(wall_around_planners[pre_uav_id]->getY()));
     curr_uav->wallAround(wall_around_planners[pre_uav_id]);
 }
 
