@@ -36,9 +36,6 @@ namespace simulation
         // 无人机数组
         std::vector<UAVPtr> uavs;
 
-        // 追击无人机数组
-        // std::vector<UAVPtr> tracking_uavs;
-
         // WallAround算法规划器
         std::vector<WallAroundPlannerPtr> wall_around_planners;
 
@@ -48,15 +45,6 @@ namespace simulation
         int tracking_uavs_index;
 
         int uavs_num;
-
-        // 用于多线程之间获取tracking uav的索引避免发生竞争
-        std::mutex tracking_uav_index_mutex;
-
-        std::queue<int> need_track_usvs_id_queue;
-        std::mutex need_track_usvs_id_mutex;
-        std::condition_variable need_track_usvs_id_cv;
-
-        ros::ServiceServer trackingIdService;
 
         // 地图宽度和高度
         int width;
@@ -75,11 +63,8 @@ namespace simulation
         // 获取下一个可得到的tracking uav id
         int getNextTrackingUAVId();
 
-        // 获取被追踪无人机uav id
-        int getPreUAVId();
-
-        bool getNeedTrackingUAVIdCallback(uavs_explore_indoor_environment::TrackingUAVId::Request &req,
-                                          uavs_explore_indoor_environment::TrackingUAVId::Response &res);
         void trackingUAVCallback();
+
+        TheardSafe m_thread_safe;
     };
 };

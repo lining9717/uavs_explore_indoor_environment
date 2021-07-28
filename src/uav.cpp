@@ -1,5 +1,15 @@
 #include "uav.h"
 
+void sendUAVId(TheardSafe *thread_safe, int id)
+{
+    // printf("sendUAVId thread_safe address: %p\n", thread_safe);
+    std::unique_lock<std::mutex> lock(thread_safe->need_track_usvs_id_mutex);
+    // printf("[Main Controller] get UAV%d\n", id);
+    thread_safe->need_track_usvs_id_queue.push(id);
+    // printf("queue size: %d\n", (int)thread_safe->need_track_usvs_id_queue.size());
+    thread_safe->need_track_usvs_id_cv.notify_one();
+}
+
 UAV::UAV::UAV(const Position &init_position, int id)
 {
     m_nh_ = ros::NodeHandle();
@@ -27,7 +37,7 @@ UAV::UAV::UAV(const Position &init_position, int id)
     m_motor_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::EnableMotors>(ss_motor_service_name.str());
     m_entrance_position_publisher_ = m_nh_.advertise<uavs_explore_indoor_environment::EntrancePosition>(ss_publish_entrance_position_topic_name.str(), 10);
     m_entrance_position_subscriber_ = m_nh_.subscribe(ss_subscrible_entrance_position_topic_name.str(), 10, &UAV::entrancePositionCallback, this);
-    m_tracking_uav_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::TrackingUAVId>(tracking_uavs_service_name);
+    // m_tracking_uav_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::TrackingUAVId>(tracking_uavs_service_name);
 
     m_x_ = 0.0;
     m_y_ = 0.0;
@@ -45,9 +55,11 @@ UAV::UAV::UAV(const Position &init_position, int id)
     m_rate_ = 1;
     m_battery_ = FULL_BATTERY;
     m_uav_state = IDLE;
+
+    thread_safe = nullptr;
 }
 
-UAV::UAV::~UAV() {}
+UAV::UAV::~UAV() { delete thread_safe; }
 
 void UAV::UAV::initForDrive()
 {
@@ -229,28 +241,6 @@ void UAV::UAV::disableMotors()
     }
 }
 
-/**
- * @brief 发送当前无人机的ID至总控程序
- * 
- */
-void UAV::UAV::sendCurrentUAVId()
-{
-    uavs_explore_indoor_environment::TrackingUAVId srv;
-    srv.request.id = m_id_;
-    if (m_tracking_uav_client_.call(srv))
-    {
-        if (srv.response.result)
-            printf("[UAV%d] Success send tracking id to service\n", m_id_);
-        else
-            printf("[UAV%d] Fail send tracking id to service\n", m_id_);
-    }
-    else
-    {
-        std::stringstream ss;
-        ss << "Failed to call service /uav" << m_id_ << tracking_uavs_service_name;
-        throw UAVException(ss.str().c_str());
-    }
-}
 
 void UAV::UAV::setStopPosition(const Position &stop_position)
 {
@@ -408,37 +398,6 @@ void UAV::UAV::fixUAVAngle(ros::Rate &loop_rate)
 
 void UAV::UAV::fixUAVRoute(ros::Rate &loop_rate)
 {
-    // if ((FRONT == next_direction or BACK == next_direction) and
-    //     fabs(m_uav_real_position_.x - m_uav_coordinate_position_.x) >= 0.3)
-    // {
-    //     printf("----------[UAV%d] fix x axis ------------\n", m_id_);
-    //     printf("[UAV%d] real position(%f, %f)\n", m_id_, m_uav_real_position_.x, m_uav_real_position_.y);
-    //     printf("[UAV%d] coordinate position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
-    //     m_msg_.linear.y = 0;
-    //     m_msg_.linear.z = 0;
-    //     m_msg_.linear.x = m_uav_real_position_.x - m_uav_coordinate_position_.x >= 0.3 ? -0.5 : 0.5;
-    //     while (ros::ok() and fabs(m_uav_real_position_.x - m_uav_coordinate_position_.x) > 0.1)
-    //     {
-    //         ros::spinOnce();
-    //         m_cmd_vel_publisher_.publish(m_msg_);
-    //     }
-    // }
-    // else if ((LEFT == next_direction or RIGHT == next_direction) and
-    //          fabs(m_uav_real_position_.y - m_uav_coordinate_position_.y) >= 0.3)
-    // {
-    //     printf("----------[UAV%d] fix y axis ------------\n", m_id_);
-    //     printf("[UAV%d] real position(%f, %f)\n", m_id_, m_uav_real_position_.x, m_uav_real_position_.y);
-    //     printf("[UAV%d] coordinate position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
-    //     m_msg_.linear.x = 0;
-    //     m_msg_.linear.z = 0;
-    //     m_msg_.linear.y = m_uav_real_position_.y - m_uav_coordinate_position_.y >= 0.3 ? -0.5 : 0.5;
-    //     while (ros::ok() and fabs(m_uav_real_position_.y - m_uav_coordinate_position_.y) > 0.1)
-    //     {
-    //         ros::spinOnce();
-    //         m_cmd_vel_publisher_.publish(m_msg_);
-    //     }
-    // }
-
     if (m_uav_real_position_.isClose(m_uav_coordinate_position_, 0.5))
         return;
     // x方向的修正
@@ -661,7 +620,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
 
             if (m_battery_ <= BATTERY_THRESHOLD and !is_send_id)
             {
-                sendCurrentUAVId();
+                sendUAVId(thread_safe, m_id_);
                 is_send_id = true;
             }
 
@@ -707,6 +666,7 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
             if (next_direction == GETGOAL)
             {
                 printf("[UAV%d] Get the goal!\n", m_id_);
+                pre_uav->stop();
                 return true;
             }
             Position next_position = getNextPsotion(next_direction);

@@ -3,6 +3,9 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
 
 typedef std::pair<int, int> Node;
 typedef int Direction;
@@ -75,3 +78,12 @@ struct Position
         return false;
     }
 };
+
+// 用于多线程之间获取tracking uav的索引避免发生竞争
+struct TheardSafe
+{
+    std::queue<int> need_track_usvs_id_queue;
+    std::mutex need_track_usvs_id_mutex;
+    std::condition_variable need_track_usvs_id_cv;
+};
+

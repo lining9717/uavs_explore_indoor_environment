@@ -12,7 +12,7 @@
 #include <ros/ros.h>
 #include <memory>
 #include <tf/transform_datatypes.h>
-
+#include <thread>
 
 typedef int UAVState;
 typedef std::shared_ptr<wallaround::WallAround> WallAroundPlannerPtr;
@@ -32,7 +32,6 @@ const std::string controller_topic_name = "/cmd_vel";
 const std::string position_topic_name = "/ground_truth_to_tf/pose";
 const std::string entrance_position_topic_name = "/entrance_position";
 const std::string motor_service_name = "/enable_motors";
-const std::string tracking_uavs_service_name = "/tracking_uav";
 
 namespace UAV
 {
@@ -47,7 +46,6 @@ namespace UAV
         ros::Subscriber m_uav_position_subscriber_;      //用于订阅获取无人机位置的话题
         ros::Publisher m_entrance_position_publisher_;   //用于发布进入边界点
         ros::Subscriber m_entrance_position_subscriber_; //用于订阅上一架UAV进入边界点
-        ros::ServiceClient m_tracking_uav_client_;       //将当前无人机id作为被追击无人机发送至总控制
 
         //无人机编号
         int m_id_;
@@ -92,9 +90,13 @@ namespace UAV
         // 是否有需要追逐的目标
         bool m_is_catch_;
 
+        
+
     public:
         //无人机当前运行状态
         int m_uav_state;
+
+        TheardSafe *thread_safe;
 
         // 无人机当前位姿
         geometry_msgs::PoseStamped m_uav_pose_msgs;
@@ -113,8 +115,6 @@ namespace UAV
         void setBattery(int b);
         int getBattery();
         int getID();
-
-        void sendCurrentUAVId();
 
         void calcuNextPosition(Direction d);
         Position getNextPsotion(Direction d);
@@ -155,6 +155,7 @@ namespace UAV
 
         //是否在飞行
         bool isFlying();
+        
     };
 };
 typedef std::shared_ptr<UAV::UAV> UAVPtr;

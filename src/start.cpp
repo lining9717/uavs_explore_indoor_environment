@@ -1,9 +1,25 @@
 #include "start.h"
 
+
+std::mutex tracking_uav_index_mutex;
+
+// 获取被追踪无人机uav id
+int getPreUAVId(TheardSafe *thread_safe)
+{
+    // printf("Lock...\n");
+    // printf("getPreUAVId thread_safe address: %p\n", thread_safe);
+    std::unique_lock<std::mutex> lock(thread_safe->need_track_usvs_id_mutex);
+    thread_safe->need_track_usvs_id_cv.wait(lock, [&]()
+                                            { return !thread_safe->need_track_usvs_id_queue.empty(); });
+    int ret = thread_safe->need_track_usvs_id_queue.front();
+    thread_safe->need_track_usvs_id_queue.pop();
+    // printf("Unlock...\n");
+    return ret;
+}
+
 simulation::Simulation::Simulation()
 {
     nh = ros::NodeHandle();
-    trackingIdService = nh.advertiseService(tracking_uavs_service_name, &simulation::Simulation::getNeedTrackingUAVIdCallback, this);
     tracking_uavs_num = tracking_uavs_positions.size();
     uavs_num = NUM_OF_UAV + tracking_uavs_num;
 
@@ -20,14 +36,11 @@ simulation::Simulation::Simulation()
     }
     x_bias = width / 2;
     y_bias = height / 2;
-    std::cout << "width:" << width << std::endl;
-    std::cout << "height:" << height << std::endl;
-    std::cout << "x_bias:" << x_bias << std::endl;
-    std::cout << "y_bias:" << y_bias << std::endl;
 
     for (int i = 0; i < NUM_OF_UAV; ++i)
     {
         uavs[i] = std::make_shared<UAV::UAV>(init_uavs_positons[i], i);
+        uavs[i]->thread_safe = &m_thread_safe;
         wall_around_planners[i] = std::make_shared<wallaround::WallAround>();
         Node start_position{getColFromX(int(init_uavs_positons[i].x)), getRowFromY(int(init_uavs_positons[i].y))};
         wall_around_planners[i]->init(start_position, map_file_path);
@@ -37,7 +50,10 @@ simulation::Simulation::Simulation()
     }
 
     for (int i = NUM_OF_UAV; i < uavs_num; ++i)
+    {
         uavs[i] = std::make_shared<UAV::UAV>(tracking_uavs_positions[i - NUM_OF_UAV], i);
+        uavs[i]->thread_safe = &m_thread_safe;
+    }
     tracking_uavs_index = NUM_OF_UAV;
 }
 
@@ -69,25 +85,6 @@ int simulation::Simulation::getRowFromY(int y)
     return y_bias - y;
 }
 
-/**
- * @brief Get the Need Tracking UAV Id Callback object
- * 
- * @param req 
- * @param res 
- * @return true 
- * @return false 
- */
-bool simulation::Simulation::getNeedTrackingUAVIdCallback(uavs_explore_indoor_environment::TrackingUAVId::Request &req,
-                                                          uavs_explore_indoor_environment::TrackingUAVId::Response &res)
-{
-    std::unique_lock<std::mutex> lock(need_track_usvs_id_mutex);
-    printf("[Main Controller] get UAV%d\n", int(req.id));
-    need_track_usvs_id_queue.push(int(req.id));
-    need_track_usvs_id_cv.notify_one();
-    res.result = true;
-    return true;
-}
-
 void simulation::Simulation::startUAVCallback(int id)
 {
     printf("Start [UAV%d]\n", id);
@@ -107,22 +104,9 @@ int simulation::Simulation::getNextTrackingUAVId()
     return ret;
 }
 
-// 获取被追踪无人机uav id
-int simulation::Simulation::getPreUAVId()
-{
-    std::unique_lock<std::mutex> lock(need_track_usvs_id_mutex);
-    while (need_track_usvs_id_queue.empty())
-    {
-        need_track_usvs_id_cv.wait(lock);
-    }
-    int ret = need_track_usvs_id_queue.front();
-    need_track_usvs_id_queue.pop();
-    return ret;
-}
-
 void simulation::Simulation::trackingUAVCallback()
 {
-    int pre_uav_id = getPreUAVId();
+    int pre_uav_id = getPreUAVId(&m_thread_safe);
     int curr_uav_id = getNextTrackingUAVId();
 
     UAVPtr curr_uav = uavs[curr_uav_id];
@@ -146,7 +130,8 @@ void simulation::Simulation::start()
 
     for (int i = NUM_OF_UAV; i < uavs_num; ++i)
         jobs[i] = std::thread(&simulation::Simulation::trackingUAVCallback, this);
-    // jobs[NUM_OF_UAV] = std::thread(&Simulation::trajectoryCallback, this);
+
+    // jobs[uavs_num] = std::thread(&Simulation::trackingThreadCallback, this);
     for (auto &thread : jobs)
         thread.join();
 }
