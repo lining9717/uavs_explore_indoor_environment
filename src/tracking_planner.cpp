@@ -14,6 +14,10 @@ void trackingplanner::TrackingPlanner::init(const Node &nstart, const Node &ngoa
         width = std::max(width, (int)input.size());
     }
     height = lab.size();
+
+    x_bias = width / 2;
+    y_bias = height / 2;
+
     std::cout << "Tracking-D*lite Map: width=" << width << ", height=" << height << std::endl;
     graph.resize(width * height);
     map_size = width * height;
@@ -259,7 +263,7 @@ Direction trackingplanner::TrackingPlanner::getDirection()
     return NONE;
 }
 
-Direction trackingplanner::TrackingPlanner::getNextPosition()
+Direction trackingplanner::TrackingPlanner::getNextTowardDirection()
 {
     if (start == goal)
         return GETGOAL;
@@ -272,8 +276,8 @@ Direction trackingplanner::TrackingPlanner::getNextPosition()
     }
     if (computePath() == false)
     {
-        std::cout << "Get target!" << std::endl;
-        return GETGOAL;
+        std::cout << "No Path!" << std::endl;
+        return NOPATH;
     }
 
     //获取找到的路径
@@ -297,10 +301,23 @@ Direction trackingplanner::TrackingPlanner::getNextPosition()
 
 void trackingplanner::TrackingPlanner::updateNextTarget(int x, int y)
 {
-    goal = y * width + x;
+    goal = getRowFromCoordinate(y) * width + getColFromCoordinate(x);
 }
 
 std::string trackingplanner::TrackingPlanner::getPlannerName()
 {
     return "Tracking-D*Lite";
+}
+
+int trackingplanner::TrackingPlanner::getColFromCoordinate(int x)
+{
+    if (x + x_bias < 0 or x + x_bias >= width)
+        printf("[ERROR] X out of bound\n");
+    return x + x_bias;
+}
+int trackingplanner::TrackingPlanner::getRowFromCoordinate(int y)
+{
+    if (y_bias - y < 0 or y_bias - y >= height)
+        printf("[ERROR] Y out of bound\n");
+    return y_bias - y;
 }

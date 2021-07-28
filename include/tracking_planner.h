@@ -54,6 +54,9 @@ namespace trackingplanner
         // 迷宫顶点编号，起始变量，上次访问
         int map_size, start, goal, last_start;
 
+        int x_bias;
+        int y_bias;
+
         //迷宫的大小。 输入后更改，m为列数，n为行数
         int width;
         int height;
@@ -73,6 +76,10 @@ namespace trackingplanner
         std::vector<int> parents;
         //最后找到的路径
         std::vector<int> path;
+
+
+        int getColFromCoordinate(int x);
+        int getRowFromCoordinate(int y);
 
     public:
         TrackingPlanner();
@@ -112,7 +119,7 @@ namespace trackingplanner
         void init(const Node &nstart, const Node &ngoal, const std::string &map_file_path);
 
         Direction getDirection();
-        Direction getNextPosition();
+        Direction getNextTowardDirection();
         void updateNextTarget(int x, int y);
 
         int sum(std::vector<int> &v);

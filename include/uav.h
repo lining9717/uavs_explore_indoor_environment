@@ -2,8 +2,10 @@
 
 #include "uavs_explore_indoor_environment/EnableMotors.h"
 #include "uavs_explore_indoor_environment/EntrancePosition.h"
+#include "uavs_explore_indoor_environment/TrackingUAVId.h"
 #include "uav_exception.h"
 #include "wall_around_planner.h"
+#include "tracking_planner.h"
 #include <cmath>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
@@ -11,8 +13,11 @@
 #include <memory>
 #include <tf/transform_datatypes.h>
 
+
 typedef int UAVState;
 typedef std::shared_ptr<wallaround::WallAround> WallAroundPlannerPtr;
+typedef std::shared_ptr<trackingplanner::TrackingPlanner> TrackingPlannerPtr;
+
 
 enum : UAVState
 {
@@ -25,8 +30,9 @@ enum : UAVState
 //话题及服务名称
 const std::string controller_topic_name = "/cmd_vel";
 const std::string position_topic_name = "/ground_truth_to_tf/pose";
-const std::string motor_service_name = "/enable_motors";
 const std::string entrance_position_topic_name = "/entrance_position";
+const std::string motor_service_name = "/enable_motors";
+const std::string tracking_uavs_service_name = "/tracking_uav";
 
 namespace UAV
 {
@@ -41,6 +47,7 @@ namespace UAV
         ros::Subscriber m_uav_position_subscriber_;      //用于订阅获取无人机位置的话题
         ros::Publisher m_entrance_position_publisher_;   //用于发布进入边界点
         ros::Subscriber m_entrance_position_subscriber_; //用于订阅上一架UAV进入边界点
+        ros::ServiceClient m_tracking_uav_client_;       //将当前无人机id作为被追击无人机发送至总控制
 
         //无人机编号
         int m_id_;
@@ -105,8 +112,15 @@ namespace UAV
         void publishEntrancePosition();
         void setBattery(int b);
         int getBattery();
+        int getID();
+
+        void sendCurrentUAVId();
 
         void calcuNextPosition(Direction d);
+        Position getNextPsotion(Direction d);
+
+        Position getEntranceStopPosition();
+        void setEntranceStopPosition(const Position &position);
 
         void waitForSubscribles();
 
@@ -124,7 +138,7 @@ namespace UAV
 
         // 无人际根据不同的算法进行导航
         void wallAround(const WallAroundPlannerPtr &planner);
-        // void track(const PlannerPtr &planner, UAVPtr &pre_uav);
+        bool track(const TrackingPlannerPtr &planner, const std::shared_ptr<UAV> &pre_uav);
 
         // 开启或关闭无人机马达
         void enableMotors();
@@ -143,5 +157,4 @@ namespace UAV
         bool isFlying();
     };
 };
-
 typedef std::shared_ptr<UAV::UAV> UAVPtr;

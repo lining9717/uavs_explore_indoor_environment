@@ -27,6 +27,7 @@ UAV::UAV::UAV(const Position &init_position, int id)
     m_motor_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::EnableMotors>(ss_motor_service_name.str());
     m_entrance_position_publisher_ = m_nh_.advertise<uavs_explore_indoor_environment::EntrancePosition>(ss_publish_entrance_position_topic_name.str(), 10);
     m_entrance_position_subscriber_ = m_nh_.subscribe(ss_subscrible_entrance_position_topic_name.str(), 10, &UAV::entrancePositionCallback, this);
+    m_tracking_uav_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::TrackingUAVId>(tracking_uavs_service_name);
 
     m_x_ = 0.0;
     m_y_ = 0.0;
@@ -42,7 +43,7 @@ UAV::UAV::UAV(const Position &init_position, int id)
 
     m_head_toward_ = FRONT;
     m_rate_ = 1;
-    m_battery_ = 150;
+    m_battery_ = FULL_BATTERY;
     m_uav_state = IDLE;
 }
 
@@ -84,6 +85,11 @@ void UAV::UAV::setBattery(int b)
 int UAV::UAV::getBattery()
 {
     return m_battery_;
+}
+
+int UAV::UAV::getID()
+{
+    return m_id_;
 }
 
 bool UAV::UAV::isFlying()
@@ -223,9 +229,42 @@ void UAV::UAV::disableMotors()
     }
 }
 
+/**
+ * @brief 发送当前无人机的ID至总控程序
+ * 
+ */
+void UAV::UAV::sendCurrentUAVId()
+{
+    uavs_explore_indoor_environment::TrackingUAVId srv;
+    srv.request.id = m_id_;
+    if (m_tracking_uav_client_.call(srv))
+    {
+        if (srv.response.result)
+            printf("[UAV%d] Success send tracking id to service\n", m_id_);
+        else
+            printf("[UAV%d] Fail send tracking id to service\n", m_id_);
+    }
+    else
+    {
+        std::stringstream ss;
+        ss << "Failed to call service /uav" << m_id_ << tracking_uavs_service_name;
+        throw UAVException(ss.str().c_str());
+    }
+}
+
 void UAV::UAV::setStopPosition(const Position &stop_position)
 {
     this->m_stop_postion_ = stop_position;
+}
+
+Position UAV::UAV::getEntranceStopPosition()
+{
+    return m_entrance_stop_postion_;
+}
+
+void UAV::UAV::setEntranceStopPosition(const Position &position)
+{
+    m_entrance_stop_postion_ = position;
 }
 
 /**
@@ -311,19 +350,19 @@ void UAV::UAV::rotateUAV(double angular, ros::Rate &loop_rate)
  * @brief 电源消耗
  * 
  * @param percent 减少幅度
- * @return true  0<battery<=30
+ * @return true  0 < battery <= BATTERY_THRESHOLD
  * @return false battery=0
  */
 bool UAV::UAV::powerConsumption(int percent)
 {
     m_battery_ -= percent;
 
-    if (m_battery_ > 0 and m_battery_ <= 30)
+    if (m_battery_ > 0 and m_battery_ <= BATTERY_THRESHOLD)
     {
         printf("[UAV%d] BATTERY STATE: Low %d%%\n", m_id_, m_battery_);
         return true;
     }
-    else if (m_battery_ > 30)
+    else if (m_battery_ > BATTERY_THRESHOLD)
     {
         printf("[UAV%d] BATTERY STATE: %d%%\n", m_id_, m_battery_);
         return true;
@@ -448,6 +487,26 @@ void UAV::UAV::calcuNextPosition(Direction d)
     // printf("[UAV%d] Next position(%f, %f)\n", m_id_, m_uav_coordinate_position_.x, m_uav_coordinate_position_.y);
 }
 
+/**
+ * @brief 通过方向计算下一次移动坐标
+ * 
+ * @param d 
+ * @return Position 
+ */
+Position UAV::UAV::getNextPsotion(Direction d)
+{
+    Position temp = m_uav_coordinate_position_;
+    if (d == FRONT)
+        temp.x += 1;
+    else if (d == BACK)
+        temp.x -= 1;
+    else if (d == LEFT)
+        temp.y += 1;
+    else
+        temp.y -= 1;
+    return temp;
+}
+
 void UAV::UAV::driveByDirection(Direction direction, ros::Rate &loop_rate)
 {
     if (direction == FRONT)
@@ -565,6 +624,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
     m_uav_state = WALL_AROUND;
     ros::Rate loop_rate(m_rate_);
     bool is_initial = true;
+    bool is_send_id = false;
     try
     {
         while (ros::ok())
@@ -586,7 +646,6 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
                 Direction towads_direction = planner->getMainDirection();
                 goToBoundary(planner, towads_direction, loop_rate);
                 m_entrance_position_ = m_uav_real_position_;
-                m_uav_state = WALL_AROUND;
                 is_initial = false;
             }
             if (m_entrance_position_publisher_.getNumSubscribers() != 0)
@@ -595,14 +654,20 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
 
             fixUAVRoute(loop_rate);
             calcuNextPosition(next_direction);
-            
+
             driveByDirection(next_direction, loop_rate);
             fixUAVAngle(loop_rate);
             hoverUAV(loop_rate);
 
+            if (m_battery_ <= BATTERY_THRESHOLD and !is_send_id)
+            {
+                sendCurrentUAVId();
+                is_send_id = true;
+            }
+
             if (m_battery_ <= 0)
             {
-                printf("[UAV%d] Stop by battery empty\n", m_id_);
+                printf("[UAV%d] Wallaround stop by battery empty\n", m_id_);
                 break;
             }
         }
@@ -613,4 +678,64 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
         std::cerr << e.what() << '\n';
     }
     m_uav_state = IDLE;
+}
+
+/**
+ * @brief 用于追击前一架无人机
+ * 
+ * @param planner 
+ * @param pre_uav 
+ */
+bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UAV> &pre_uav)
+{
+    m_uav_state = TRACKING;
+    Position moving_target;
+    ros::Rate loop_rate(m_rate_);
+    try
+    {
+        while (ros::ok())
+        {
+            ros::spinOnce(); //获取无人机位置
+            moving_target = pre_uav->getUAVCoordinatePosition();
+            printf("[UAV%d] get target UAV%d position(%d, %d)\n", m_id_, pre_uav->getID(), (int)moving_target.x, (int)moving_target.y);
+
+            planner->updateNextTarget(int(moving_target.x), int(moving_target.y));
+            Direction next_direction = planner->getNextTowardDirection(); //获取下一次前进的方向
+
+            if (next_direction == NOPATH)
+                throw UAVException("No path");
+            if (next_direction == GETGOAL)
+            {
+                printf("[UAV%d] Get the goal!\n", m_id_);
+                return true;
+            }
+            Position next_position = getNextPsotion(next_direction);
+            if (pre_uav->isFlying() and
+                fabs(next_position.x - moving_target.x) + fabs(next_position.y - moving_target.y) < 2)
+            {
+                printf("[UAV%d] stoped by UAV%d\n", pre_uav->getID(), m_id_);
+                pre_uav->stop();
+                return true;
+            }
+            printf("[UAV%d] next tracking position(%d, %d)\n", m_id_, int(next_position.x), int(next_position.y));
+            fixUAVRoute(loop_rate);
+            m_uav_coordinate_position_ = next_position;
+            driveByDirection(next_direction, loop_rate);
+            fixUAVAngle(loop_rate);
+            hoverUAV(loop_rate);
+
+            if (m_battery_ <= 0)
+            {
+                printf("[UAV%d] Tracking stop by battery empty\n", m_id_);
+                break;
+            }
+        }
+        stop();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    m_uav_state = IDLE;
+    return false;
 }

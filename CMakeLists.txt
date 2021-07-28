@@ -15,7 +15,7 @@ find_package(
              std_msgs
              visualization_msgs)
 
-add_service_files(FILES EnableMotors.srv)
+add_service_files(FILES EnableMotors.srv TrackingUAVId.srv)
 
 add_message_files(FILES EntrancePosition.msg)
 
