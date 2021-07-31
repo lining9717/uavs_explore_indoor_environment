@@ -39,6 +39,9 @@ namespace simulation
         // WallAround算法规划器
         std::vector<WallAroundPlannerPtr> wall_around_planners;
 
+
+        std::vector<bool> is_uav_used;
+
         // 追击无人机的数量
         int tracking_uavs_num;
         // 当前可派出追击无人机的索引

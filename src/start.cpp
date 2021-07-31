@@ -17,12 +17,17 @@ int getPreUAVId(TheardSafe *thread_safe)
     return ret;
 }
 
+float getDistanceBetweenPositions(const Position &p1, const Position &p2)
+{
+    return sqrt(powf(fabs(p1.x - p2.x), 2) + powf(fabs(p1.y - p2.y), 2));
+}
+
 simulation::Simulation::Simulation()
 {
     nh = ros::NodeHandle();
     tracking_uavs_num = tracking_uavs_positions.size();
     uavs_num = NUM_OF_UAV + tracking_uavs_num;
-
+    is_uav_used = std::vector<bool>(tracking_uavs_num, false);
     uavs = std::vector<UAVPtr>(uavs_num);
     wall_around_planners = std::vector<WallAroundPlannerPtr>(NUM_OF_UAV);
 
@@ -108,16 +113,32 @@ void simulation::Simulation::startUAVCallback(int id)
 
 int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
 {
-    if (tracking_uavs_index > uavs_num)
-        return -1;
+    // if (tracking_uavs_index > uavs_num)
+    //     return -1;
     int last_sequence_take_off = sequence_take_off;
     std::lock_guard<std::mutex> lock(tracking_uav_index_mutex);
-    int ret = tracking_uavs_index;
-    ++tracking_uavs_index;
+    int ret = -1;
+    float min_distance = 1000;
+    for (int i = NUM_OF_UAV; i < uavs_num; ++i)
+    {
+        if (is_uav_used[i - NUM_OF_UAV])
+            continue;
+        int temp_distance = getDistanceBetweenPositions(uavs[i]->getUAVCoordinatePosition(),
+                                                        uavs[pre_uav_id]->getUAVCoordinatePosition());
+        if (min_distance > temp_distance)
+        {
+            ret = i;
+            min_distance = temp_distance;
+        }
+    }
+    is_uav_used[ret - NUM_OF_UAV] = true;
     if (last_sequence_take_off != sequence_take_off)
         sleep(3);
-    ++sequence_take_off;
     return ret;
+    // int ret = tracking_uavs_index;
+    // ++tracking_uavs_index;
+    // ++sequence_take_off;
+    // return ret;
 }
 
 void simulation::Simulation::trackingUAVCallback()
@@ -141,10 +162,15 @@ void simulation::Simulation::trackingUAVCallback()
 
     if (!curr_uav->track(track_planner, uavs[pre_uav_id]))
         return;
+
+    printf("Before [UAV%d] curr_uav_coordinate(%d, %d), curr_uav_real(%f,%f), WallAround(%d,%d)\n", curr_uav_id,
+           (int)curr_uav->getUAVCoordinatePosition().x, (int)curr_uav->getUAVCoordinatePosition().y,
+           curr_uav->getUAVRealPosition().x, curr_uav->getUAVRealPosition().y,
+           getXFromCol(wall_around_planners[pre_uav_id]->getX()), getYFromRow(wall_around_planners[pre_uav_id]->getY()));
     curr_uav->setUAVCoordinatePosition(getXFromCol(wall_around_planners[pre_uav_id]->getX()),
                                        getYFromRow(wall_around_planners[pre_uav_id]->getY()));
     curr_uav->fixTransitionPosition();
-    printf("[UAV%d] curr_uav_coordinate(%d, %d), pre_uav_real(%f,%f), WallAround(%d,%d)\n", curr_uav_id,
+    printf("After [UAV%d] curr_uav_coordinate(%d, %d), curr_uav_real(%f,%f), WallAround(%d,%d)\n", curr_uav_id,
            (int)curr_uav->getUAVCoordinatePosition().x, (int)curr_uav->getUAVCoordinatePosition().y,
            curr_uav->getUAVRealPosition().x, curr_uav->getUAVRealPosition().y,
            getXFromCol(wall_around_planners[pre_uav_id]->getX()), getYFromRow(wall_around_planners[pre_uav_id]->getY()));

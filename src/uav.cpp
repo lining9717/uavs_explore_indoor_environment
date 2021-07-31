@@ -403,7 +403,7 @@ void UAV::UAV::fixUAVAngle(ros::Rate &loop_rate)
 
 void UAV::UAV::fixUAVRoute(ros::Rate &loop_rate)
 {
-    if (m_uav_real_position_.isClose(m_uav_coordinate_position_, 0.3))
+    if (m_uav_real_position_.isClose(m_uav_coordinate_position_, 0.25))
         return;
     // x方向的修正
     while (ros::ok() and fabs(m_uav_real_position_.x - m_uav_coordinate_position_.x) > 0.1)

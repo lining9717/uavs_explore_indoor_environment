@@ -89,6 +89,7 @@ namespace UAV
         // 是否有需要追逐的目标
         bool m_is_catch_;
 
+
     public:
         //无人机当前运行状态
         int m_uav_state;
