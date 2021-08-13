@@ -54,7 +54,7 @@ UAV::UAV::UAV(const Position &init_position, int id)
     m_head_toward_ = FRONT;
     m_rate_ = 1;
     m_battery_ = FULL_BATTERY;
-    m_uav_state = IDLE;
+    state = IDLE;
 
     thread_safe = nullptr;
 }
@@ -82,6 +82,7 @@ void UAV::UAV::initForDrive()
 
         fixUAVAngle(loop_rate);
         hoverUAV(loop_rate);
+        state = FLYING;
     }
     catch (const std::exception &e)
     {
@@ -106,7 +107,7 @@ int UAV::UAV::getID()
 
 bool UAV::UAV::isFlying()
 {
-    return m_uav_state != IDLE;
+    return state != IDLE;
 }
 
 void UAV::UAV::setTarget(const Position &position)
@@ -135,6 +136,7 @@ void UAV::UAV::stop()
     m_msg_.angular.z = 0;
     m_cmd_vel_publisher_.publish(m_msg_);
     disableMotors();
+    state = IDLE;
 }
 /**
  * @brief 获取无人机实时位置的回调函数
@@ -147,7 +149,7 @@ void UAV::UAV::positionCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
     m_uav_real_position_.y = msg->pose.position.y;
     m_uav_real_position_.z = msg->pose.position.z;
     m_yaw_ = tf::getYaw(msg->pose.orientation) * 180 / M_PI;
-    m_uav_pose_msgs = *msg;
+    pose = *msg;
 }
 
 /**
@@ -591,7 +593,6 @@ Direction UAV::UAV::caculateDirection(const std::pair<int, int> &next_position)
  */
 void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
 {
-    m_uav_state = WALL_AROUND;
     ros::Rate loop_rate(m_rate_);
     bool is_initial = true;
     bool is_send_id = false;
@@ -604,11 +605,13 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
                 m_uav_real_position_.isClose(m_entrance_stop_postion_, 0.5))
             {
                 printf("[UAV%d]  Finish by m_entrance_stop_postion_!\n", m_id_);
+                state = IDLE;
                 break;
             }
             if (m_stop_postion_ == m_uav_real_position_)
             {
                 printf("[UAV%d]  Finish by m_stop_postion_!\n", m_id_);
+                state = IDLE;
                 break;
             }
             if (is_initial) // 起飞时进行初始化，导向最近的边界，并确定主方向
@@ -617,6 +620,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
                 goToBoundary(planner, towads_direction, loop_rate);
                 m_entrance_position_ = m_uav_real_position_;
                 is_initial = false;
+                state = WALL_AROUND;
             }
             if (m_entrance_position_publisher_.getNumSubscribers() != 0)
                 publishEntrancePosition();
@@ -638,6 +642,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
             if (m_battery_ <= 0)
             {
                 printf("[UAV%d] Wallaround stop by battery empty\n", m_id_);
+                state = IDLE;
                 break;
             }
         }
@@ -647,7 +652,6 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
     {
         std::cerr << e.what() << '\n';
     }
-    m_uav_state = IDLE;
 }
 
 /**
@@ -658,7 +662,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
  */
 bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UAV> &pre_uav)
 {
-    m_uav_state = TRACKING;
+    state = TRACKING;
     Position moving_target;
     ros::Rate loop_rate(m_rate_);
     try
@@ -677,15 +681,23 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
             }
             if (next_x_y.first == GETGOAL)
             {
+                state = WALL_AROUND;
                 return true;
             }
             if (next_x_y.first == NOPATH)
+            {
+                state = IDLE;
                 throw UAVException("No path");
+            }
+
             printf("[UAV%d] next tracking position(%d, %d)\n", m_id_, int(next_x_y.first), int(next_x_y.second));
 
             Direction next_direction = caculateDirection(next_x_y);
             if (next_direction == NONE)
+            {
+                state = IDLE;
                 throw UAVException("Next direction caculation error.");
+            }
 
             fixUAVRoute(loop_rate);
 
@@ -698,6 +710,7 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
             if (m_battery_ <= 0)
             {
                 printf("[UAV%d] Tracking stop by battery empty\n", m_id_);
+                state = IDLE;
                 break;
             }
             moving_target = pre_uav->getUAVCoordinatePosition();
@@ -709,6 +722,6 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
     {
         std::cerr << e.what() << '\n';
     }
-    m_uav_state = IDLE;
+
     return false;
 }

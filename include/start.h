@@ -57,6 +57,8 @@ namespace simulation
         int x_bias;
         int y_bias;
 
+        std::vector<std::string> grid_map;
+
         // 从中心原点转化为左上角原点
         int getColFromX(int x);
 
@@ -73,6 +75,8 @@ namespace simulation
         int getNextTrackingUAVId(int pre_uav_id);
 
         void trackingUAVCallback();
+        void obstacleMapCallback();
+        void trajectoryCallback();
 
         TheardSafe m_thread_safe;
     };

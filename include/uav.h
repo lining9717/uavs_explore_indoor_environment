@@ -92,12 +92,12 @@ namespace UAV
 
     public:
         //无人机当前运行状态
-        int m_uav_state;
+        int state;
 
         TheardSafe *thread_safe;
 
         // 无人机当前位姿
-        geometry_msgs::PoseStamped m_uav_pose_msgs;
+        geometry_msgs::PoseStamped pose;
 
         UAV(const Position &init_position, int id);
         ~UAV();

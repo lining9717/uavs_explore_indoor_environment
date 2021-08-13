@@ -37,6 +37,7 @@ simulation::Simulation::Simulation()
     while (mapfile >> input)
     {
         ++height;
+        grid_map.push_back(input);
         width = std::max(width, (int)input.size());
     }
     x_bias = width / 2;
@@ -141,6 +142,134 @@ int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
     // return ret;
 }
 
+void simulation::Simulation::obstacleMapCallback()
+{
+    ros::Publisher marker_pub = nh.advertise<visualization_msgs::MarkerArray>("obstacle_map", 10);
+    visualization_msgs::MarkerArray obstacles;
+    ros::Rate loop_rate(10);
+
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            if (grid_map[y][x] == '#')
+            {
+                visualization_msgs::Marker marker;
+                marker.header.frame_id = "/simulation_frame";
+                marker.header.stamp = ros::Time::now();
+                marker.ns = "obstacle_map";
+                marker.id = y * width + x;
+                marker.type = visualization_msgs::Marker::CUBE;
+                marker.action = visualization_msgs::Marker::ADD;
+
+                marker.pose.position.x = getXFromCol(x);
+                marker.pose.position.y = getYFromRow(y);
+                marker.pose.position.z = 1;
+
+                marker.pose.orientation.x = 0.0;
+                marker.pose.orientation.y = 0.0;
+                marker.pose.orientation.z = 0.0;
+                marker.pose.orientation.w = 1.0;
+
+                marker.scale.x = 1.0;
+                marker.scale.y = 1.0;
+                marker.scale.z = 2.0;
+
+                marker.color.r = 0.5f;
+                marker.color.g = 0.5f;
+                marker.color.b = 0.5f;
+                marker.color.a = 1.0;
+
+                marker.lifetime = ros::Duration();
+                obstacles.markers.push_back(marker);
+            }
+        }
+    }
+    while (ros::ok())
+    {
+        marker_pub.publish(obstacles);
+        loop_rate.sleep();
+    }
+}
+
+void simulation::Simulation::trajectoryCallback()
+{
+    std::vector<ros::Publisher> path_pubs = std::vector<ros::Publisher>(uavs_num);                                // 轨迹发布
+    std::vector<nav_msgs::Path> wall_around_msgs = std::vector<nav_msgs::Path>(uavs_num);                         // 轨迹
+    std::vector<ros::Publisher> marker_pubs = std::vector<ros::Publisher>(uavs_num);                              // 无人机位置发布
+    std::vector<visualization_msgs::Marker> uav_markers_msgs = std::vector<visualization_msgs::Marker>(uavs_num); // 无人机位置
+    std::vector<ros::Publisher> tracking_pubs = std::vector<ros::Publisher>(uavs_num);                            // 轨迹发布
+    std::vector<nav_msgs::Path> tracking_msgs = std::vector<nav_msgs::Path>(uavs_num);                            // 轨迹
+
+    for (int i = 0; i < uavs_num; ++i)
+    {
+        std::stringstream ss_path_topic;
+        ss_path_topic << "uav" << i << "_path";
+
+        std::stringstream ss_position_topic;
+        ss_position_topic << "uav" << i << "_position";
+
+        std::stringstream ss_tracking_topic;
+        ss_tracking_topic << "uav" << i << "_tracking";
+
+        path_pubs[i] = nh.advertise<nav_msgs::Path>(ss_path_topic.str(), 10, true);
+        tracking_pubs[i] = nh.advertise<nav_msgs::Path>(ss_tracking_topic.str(), 10, true);
+        marker_pubs[i] = nh.advertise<visualization_msgs::Marker>(ss_position_topic.str(), 10);
+
+        wall_around_msgs[i].header.stamp = ros::Time::now();
+        wall_around_msgs[i].header.frame_id = "/simulation_frame";
+
+        tracking_msgs[i].header.stamp = ros::Time::now();
+        tracking_msgs[i].header.frame_id = "/simulation_frame";
+
+        uav_markers_msgs[i].header.stamp = ros::Time::now();
+        uav_markers_msgs[i].header.frame_id = "/simulation_frame";
+        uav_markers_msgs[i].ns = ss_position_topic.str();
+        uav_markers_msgs[i].action = visualization_msgs::Marker::ADD;
+        uav_markers_msgs[i].type = visualization_msgs::Marker::SPHERE;
+        uav_markers_msgs[i].id = 0;
+        uav_markers_msgs[i].pose.orientation.w = 1.0;
+        uav_markers_msgs[i].scale.x = 0.2;
+        uav_markers_msgs[i].scale.y = 0.2;
+        uav_markers_msgs[i].scale.z = 0.2;
+        uav_markers_msgs[i].color.r = 1.0f;
+        uav_markers_msgs[i].color.a = 1.0;
+    }
+
+    ros::Rate loop_rate(10);
+    while (ros::ok())
+    {
+        for (int i = 0; i < uavs_num; ++i)
+        {
+            if (uavs[i]->state == IDLE)
+                continue;
+
+            geometry_msgs::PoseStamped temp_path;
+            temp_path = uavs[i]->pose;
+            uav_markers_msgs[i].pose.position = temp_path.pose.position;
+            if (uavs[i]->state == WALL_AROUND)
+            {
+                if (!tracking_msgs[i].poses.empty())
+                {
+                    tracking_msgs[i].poses.clear();
+                    tracking_pubs[i].publish(tracking_msgs[i]);
+                }
+                wall_around_msgs[i].poses.push_back(temp_path);
+                path_pubs[i].publish(wall_around_msgs[i]);
+            }
+
+            if (uavs[i]->state == TRACKING)
+            {
+                tracking_msgs[i].poses.push_back(temp_path);
+                tracking_pubs[i].publish(tracking_msgs[i]);
+            }
+            marker_pubs[i].publish(uav_markers_msgs[i]);
+            ros::spinOnce();
+        }
+        loop_rate.sleep();
+    }
+}
+
 void simulation::Simulation::trackingUAVCallback()
 {
     int pre_uav_id = getPreUAVId(&m_thread_safe);
@@ -162,7 +291,6 @@ void simulation::Simulation::trackingUAVCallback()
 
     if (!curr_uav->track(track_planner, uavs[pre_uav_id]))
         return;
-
     printf("Before [UAV%d] curr_uav_coordinate(%d, %d), curr_uav_real(%f,%f), WallAround(%d,%d)\n", curr_uav_id,
            (int)curr_uav->getUAVCoordinatePosition().x, (int)curr_uav->getUAVCoordinatePosition().y,
            curr_uav->getUAVRealPosition().x, curr_uav->getUAVRealPosition().y,
@@ -179,14 +307,14 @@ void simulation::Simulation::trackingUAVCallback()
 
 void simulation::Simulation::start()
 {
-    std::vector<std::thread> jobs(uavs_num);
+    std::vector<std::thread> jobs(uavs_num + 2);
     for (int i = 0; i < NUM_OF_UAV; ++i)
         jobs[i] = std::thread(&simulation::Simulation::startUAVCallback, this, i);
 
     for (int i = NUM_OF_UAV; i < uavs_num; ++i)
         jobs[i] = std::thread(&simulation::Simulation::trackingUAVCallback, this);
-
-    // jobs[uavs_num] = std::thread(&Simulation::trackingThreadCallback, this);
+    jobs[uavs_num] = std::thread(&Simulation::obstacleMapCallback, this);
+    jobs[uavs_num + 1] = std::thread(&Simulation::trajectoryCallback, this);
     for (auto &thread : jobs)
         thread.join();
 }
