@@ -1,5 +1,8 @@
 #include "uav.h"
 
+//网格地图路径
+extern int NUM_OF_UAV;
+
 void sendUAVId(TheardSafe *thread_safe, int id)
 {
     // printf("sendUAVId thread_safe address: %p\n", thread_safe);
@@ -37,8 +40,6 @@ UAV::UAV::UAV(const Position &init_position, int id)
     m_motor_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::EnableMotors>(ss_motor_service_name.str());
     m_entrance_position_publisher_ = m_nh_.advertise<uavs_explore_indoor_environment::EntrancePosition>(ss_publish_entrance_position_topic_name.str(), 10);
     m_entrance_position_subscriber_ = m_nh_.subscribe(ss_subscrible_entrance_position_topic_name.str(), 10, &UAV::entrancePositionCallback, this);
-    // m_tracking_uav_client_ = m_nh_.serviceClient<uavs_explore_indoor_environment::TrackingUAVId>(tracking_uavs_service_name);
-
     m_x_ = 0.0;
     m_y_ = 0.0;
     m_z_ = 0.0;
@@ -59,7 +60,11 @@ UAV::UAV::UAV(const Position &init_position, int id)
     thread_safe = nullptr;
 }
 
-UAV::UAV::~UAV() { delete thread_safe; }
+UAV::UAV::~UAV()
+{
+    m_logger_.close();
+    delete thread_safe;
+}
 
 void UAV::UAV::initForDrive()
 {
@@ -88,6 +93,23 @@ void UAV::UAV::initForDrive()
     {
         std::cerr << e.what() << '\n';
     }
+}
+
+//记录无人机行驶轨迹
+bool UAV::UAV::setLoggerFile(const std::string &log_file_path)
+{
+    std::stringstream ss;
+    ss << log_file_path << "/uav" << m_id_ << ".txt";
+    std::string logger_file;
+    ss >> logger_file;
+    std::cout << "uav" << m_id_ << " logger: " << logger_file << std::endl;
+    m_logger_.open(logger_file, std::ios::out);
+    if (!m_logger_.is_open())
+    {
+        std::cout << "Open " << logger_file << " file failure." << std::endl;
+        return false;
+    }
+    return true;
 }
 
 void UAV::UAV::setBattery(int b)
@@ -249,10 +271,10 @@ void UAV::UAV::disableMotors()
     }
 }
 
-void UAV::UAV::setStopPosition(const Position &stop_position)
-{
-    this->m_stop_postion_ = stop_position;
-}
+// void UAV::UAV::setStopPosition(const Position &stop_position)
+// {
+//     this->m_stop_postion_ = stop_position;
+// }
 
 Position UAV::UAV::getEntranceStopPosition()
 {
@@ -503,14 +525,25 @@ void UAV::UAV::goToBoundary(const WallAroundPlannerPtr &planner, const Direction
         planner->move(direction);
         ++distance;
     }
-    if (direction == FRONT)
-        m_uav_coordinate_position_.x += distance;
-    else if (direction == BACK)
-        m_uav_coordinate_position_.x -= distance;
-    else if (direction == RIGHT)
-        m_uav_coordinate_position_.y -= distance;
-    else
-        m_uav_coordinate_position_.y += distance;
+    for (int d = 1; d <= distance; ++d)
+    {
+        switch (direction)
+        {
+        case FRONT:
+            m_uav_coordinate_position_.x += 1;
+            break;
+        case BACK:
+            m_uav_coordinate_position_.x -= 1;
+            break;
+        case RIGHT:
+            m_uav_coordinate_position_.y -= 1;
+            break;
+        default:
+            m_uav_coordinate_position_.y += 1;
+            break;
+        }
+        m_logger_ << m_uav_coordinate_position_.x << " " << m_uav_coordinate_position_.y << std::endl;
+    }
     while (ros::ok() and distance > 0)
     {
         if (direction == FRONT)
@@ -608,12 +641,12 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
                 state = IDLE;
                 break;
             }
-            if (m_stop_postion_ == m_uav_real_position_)
-            {
-                printf("[UAV%d]  Finish by m_stop_postion_!\n", m_id_);
-                state = IDLE;
-                break;
-            }
+            // if (m_stop_postion_ == m_uav_real_position_)
+            // {
+            //     printf("[UAV%d]  Finish by m_stop_postion_!\n", m_id_);
+            //     state = IDLE;
+            //     break;
+            // }
             if (is_initial) // 起飞时进行初始化，导向最近的边界，并确定主方向
             {
                 Direction towads_direction = planner->getMainDirection();
@@ -628,6 +661,7 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
 
             fixUAVRoute(loop_rate);
             calcuNextPosition(next_direction);
+            m_logger_ << m_uav_coordinate_position_.x << " " << m_uav_coordinate_position_.y << std::endl;
 
             driveByDirection(next_direction, loop_rate);
             fixUAVAngle(loop_rate);
@@ -706,6 +740,7 @@ bool UAV::UAV::track(const TrackingPlannerPtr &planner, const std::shared_ptr<UA
             hoverUAV(loop_rate);
             m_uav_coordinate_position_.x = next_x_y.first;
             m_uav_coordinate_position_.y = next_x_y.second;
+            m_logger_ << m_uav_coordinate_position_.x << " " << m_uav_coordinate_position_.y << std::endl;
 
             if (m_battery_ <= 0)
             {

@@ -4,7 +4,7 @@
 
   <!-- Start Gazebo with wg world running in (max) realtime -->
   <include file="$(find hector_gazebo_worlds)/launch/start.launch">
-    <arg name="world" value="$(find uavs_explore_indoor_environment)/worlds/map7.world"/>
+    <arg name="world" value="$(find uavs_explore_indoor_environment)/worlds/map_15_30.world"/>
   </include>
 
   <!-- Spawn simulated quadrotor uav -->

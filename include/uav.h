@@ -13,6 +13,7 @@
 #include <memory>
 #include <tf/transform_datatypes.h>
 #include <thread>
+#include <fstream>
 
 typedef int UAVState;
 typedef std::shared_ptr<wallaround::WallAround> WallAroundPlannerPtr;
@@ -89,6 +90,8 @@ namespace UAV
         // 是否有需要追逐的目标
         bool m_is_catch_;
 
+        //记录路径
+        std::ofstream m_logger_;
 
     public:
         //无人机当前运行状态
@@ -148,13 +151,16 @@ namespace UAV
         void stop();
 
         // 搜索完毕时的停止点
-        void setStopPosition(const Position &stop_position);
+        // void setStopPosition(const Position &stop_position);
 
         // 电源消耗
         bool powerConsumption(int percent);
 
         //是否在飞行
         bool isFlying();
+
+        //记录无人机行驶轨迹
+        bool setLoggerFile(const std::string &log_file_path);
     };
 };
 typedef std::shared_ptr<UAV::UAV> UAVPtr;

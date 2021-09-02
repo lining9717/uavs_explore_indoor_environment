@@ -104,4 +104,21 @@
     </include>
   </group>
 
+  <group ns="uav6">
+    <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch">
+      <arg name="name" value="uav6" />
+      <arg name="tf_prefix" value="uav6" />
+      <arg name="x" default="-1.0"/>
+      <arg name="y" default="0.0"/>
+      <arg name="z" default="0.3"/>
+      <arg name="model" value="$(find hector_quadrotor_description)/urdf/quadrotor_hokuyo_utm30lx.gazebo.xacro"/>
+      <arg name="controllers" value="
+                controller/attitude
+                controller/velocity
+                controller/position
+                "/>
+    </include>
+  </group>
+
+
 </launch>

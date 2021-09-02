@@ -3,6 +3,12 @@
 std::mutex tracking_uav_index_mutex;
 int sequence_take_off = 1;
 
+// 记录日志
+std::string log_file_path;
+//网格地图路径
+std::string map_file_path;
+int NUM_OF_UAV;
+
 // 获取被追踪无人机uav id
 int getPreUAVId(TheardSafe *thread_safe)
 {
@@ -107,15 +113,15 @@ void simulation::Simulation::startUAVCallback(int id)
 {
     printf("Start [UAV%d]\n", id);
     UAVPtr curr_uav = uavs[id];
-    curr_uav->setStopPosition(end_position);
+    if (uavs[id]->setLoggerFile(log_file_path))
+        return;
+    printf("setLoggerFile [UAV%d] success\n", id);
     curr_uav->initForDrive();
     curr_uav->wallAround(wall_around_planners[id]);
 }
 
 int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
 {
-    // if (tracking_uavs_index > uavs_num)
-    //     return -1;
     int last_sequence_take_off = sequence_take_off;
     std::lock_guard<std::mutex> lock(tracking_uav_index_mutex);
     int ret = -1;
@@ -136,10 +142,6 @@ int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
     if (last_sequence_take_off != sequence_take_off)
         sleep(3);
     return ret;
-    // int ret = tracking_uavs_index;
-    // ++tracking_uavs_index;
-    // ++sequence_take_off;
-    // return ret;
 }
 
 void simulation::Simulation::obstacleMapCallback()
@@ -277,8 +279,9 @@ void simulation::Simulation::trackingUAVCallback()
 
     printf("UAV%d catch UAV%d\n", curr_uav_id, pre_uav_id);
     UAVPtr curr_uav = uavs[curr_uav_id];
+    if (curr_uav->setLoggerFile(log_file_path))
+        return;
     curr_uav->setEntranceStopPosition(uavs[pre_uav_id]->getEntranceStopPosition());
-    curr_uav->setStopPosition(end_position);
 
     Node start_position{getColFromX(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].x)),
                         getRowFromY(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].y))};
@@ -307,14 +310,14 @@ void simulation::Simulation::trackingUAVCallback()
 
 void simulation::Simulation::start()
 {
-    std::vector<std::thread> jobs(uavs_num + 2);
+    std::vector<std::thread> jobs(uavs_num);
     for (int i = 0; i < NUM_OF_UAV; ++i)
         jobs[i] = std::thread(&simulation::Simulation::startUAVCallback, this, i);
 
     for (int i = NUM_OF_UAV; i < uavs_num; ++i)
         jobs[i] = std::thread(&simulation::Simulation::trackingUAVCallback, this);
-    jobs[uavs_num] = std::thread(&Simulation::obstacleMapCallback, this);
-    jobs[uavs_num + 1] = std::thread(&Simulation::trajectoryCallback, this);
+    // jobs[uavs_num] = std::thread(&Simulation::obstacleMapCallback, this);
+    // jobs[uavs_num + 1] = std::thread(&Simulation::trajectoryCallback, this);
     for (auto &thread : jobs)
         thread.join();
 }
@@ -322,6 +325,31 @@ void simulation::Simulation::start()
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "uavs_simulation");
+    std::string path = ros::package::getPath("uavs_explore_indoor_environment");
+    std::cout << path << std::endl;
+    int temp_uav_num;
+    std::string temp_log_file_path;
+    std::string temp_map_file;
+
+    if (ros::param::get("~log_file_path", temp_log_file_path))
+        log_file_path = path + temp_log_file_path;
+    else
+        log_file_path = path + "/path_log/20_20_world/two_uavs";
+
+    if (ros::param::get("~map_file", temp_map_file))
+        map_file_path = path + temp_map_file;
+    else
+        map_file_path = path + "/maps/map_20_20.txt";
+
+    if (ros::param::get("~uav_num", temp_uav_num))
+        NUM_OF_UAV = temp_uav_num;
+    else
+        NUM_OF_UAV = 2;
+
+    std::cout << "NUM_OF_UAV:" << NUM_OF_UAV << std::endl;
+    std::cout << "log_file_path:" << log_file_path << std::endl;
+    std::cout << "map_file:" << map_file_path << std::endl;
+
     std::shared_ptr<simulation::Simulation> p_simulation = std::make_shared<simulation::Simulation>();
     p_simulation->start();
     return 0;

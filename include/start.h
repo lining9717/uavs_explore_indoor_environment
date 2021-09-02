@@ -13,6 +13,7 @@
 #include <tf/tf.h>
 #include <queue>
 #include <mutex>
+#include <ros/package.h>
 #include <condition_variable>
 
 namespace simulation
