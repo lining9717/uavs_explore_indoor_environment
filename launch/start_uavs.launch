@@ -2,8 +2,8 @@
 
 <launch>
     <node pkg="uavs_explore_indoor_environment" type="UAVsExploreIndoorEnvironment" name="start_uavs" output="screen">
-        <param name="map_file" type="string" value="/maps/map_15_30.txt"/>
-        <param name="log_file_path" type="string" value="/path_log/15_30_world/four_uavs"/>
+        <param name="map_file" type="string" value="/maps/map_40_40.txt"/>
+        <param name="log_file_path" type="string" value="/path_log/40_40_world/four_uavs"/>
         <param name="uav_num" type="int" value="4"/>
     </node>
 

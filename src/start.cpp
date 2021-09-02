@@ -113,7 +113,7 @@ void simulation::Simulation::startUAVCallback(int id)
 {
     printf("Start [UAV%d]\n", id);
     UAVPtr curr_uav = uavs[id];
-    if (uavs[id]->setLoggerFile(log_file_path))
+    if (!uavs[id]->setLoggerFile(log_file_path))
         return;
     printf("setLoggerFile [UAV%d] success\n", id);
     curr_uav->initForDrive();
@@ -279,7 +279,7 @@ void simulation::Simulation::trackingUAVCallback()
 
     printf("UAV%d catch UAV%d\n", curr_uav_id, pre_uav_id);
     UAVPtr curr_uav = uavs[curr_uav_id];
-    if (curr_uav->setLoggerFile(log_file_path))
+    if (!curr_uav->setLoggerFile(log_file_path))
         return;
     curr_uav->setEntranceStopPosition(uavs[pre_uav_id]->getEntranceStopPosition());
 
