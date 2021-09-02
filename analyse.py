@@ -1,24 +1,27 @@
 import os
 
 
-def get_filelist(dir, uav_num_str):
-    for home, dirs, files in os.walk(dir):
-        for filename in files:
-            uav_num = str(home).split('/')[-1]
-            if uav_num != uav_num_str:
+def get_file_info(dir):
+    for home, dirs, _ in os.walk(dir):
+        for name in dirs:
+            if str(name)[-4:] != "uavs":
                 continue
-            map_name = str(home).split("/")[1][0:5]
-            uav_index = int(str(filename).split('.')[0][-1])
-            fullname = os.path.join(home, filename)
-            all_position = []
-            with open(fullname) as lines:
-                ll = lines.readlines()
-                for line in ll:
-                    x = int(line.split(' ')[0])
-                    y = int(line.split(' ')[1])
-                    all_position.append((x, y))
-            all_position = set(all_position)
-            uav_cover[uav_num_str][map_name][uav_index] = len(all_position)
+            map_name_key = str(home).split("/")[1][0:5]
+            uav_cover_key = name
+            all_position = set()
+            for root, _, files in os.walk(os.path.join(home, name)):
+                for f in files:
+                    uav_index = int(str(f).split('.')[0][-1])
+                    fullname = os.path.join(root, f)
+                    origin_num = len(all_position)
+                    with open(fullname) as lines:
+                        ll = lines.readlines()
+                        for line in ll:
+                            x = int(line.split(' ')[0])
+                            y = int(line.split(' ')[1])
+                            all_position.add((x, y))
+                    add_num = len(all_position) - origin_num
+                    uav_cover[uav_cover_key][map_name_key][uav_index] = add_num
 
 
 def get_map_info(dir):
@@ -43,10 +46,7 @@ if __name__ == "__main__":
     result = {}
 
     get_map_info("maps")
-    get_filelist('path_log', "two_uavs")
-    get_filelist('path_log', "three_uavs")
-    get_filelist('path_log', "four_uavs")
-    print(maps)
+    get_file_info("path_log")
 
     for uav_key, uav_value in uav_cover.items():
         with open("result_" + uav_key + '.txt', 'w', encoding='utf-8') as f:
@@ -54,12 +54,6 @@ if __name__ == "__main__":
                 f.write(key + ",")
                 for i in range(0, len(value)):
                     if i == len(value) - 1:
-                        f.write(str(value[i]) + ",")
+                        f.write(str(value[i]) + "\n")
                     else:
                         f.write(str(value[i]) + " ")
-                if uav_key == 'three_uavs':
-                    f.write(str(sum(value[0:2])) + " " + str(sum(value)) + "\n")
-                elif uav_key == 'two_uavs':
-                    f.write(str(sum(value)) + "\n")
-                else:
-                    f.write(str(sum(value[0:2])) + " " + str(sum(value[0:3])) + " " + str(sum(value)) + "\n")
