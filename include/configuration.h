@@ -21,5 +21,5 @@ const std::vector<Direction> init_uavs_direction{FRONT, LEFT, BACK, RIGHT};
 const std::vector<Position> tracking_uavs_positions{
     {2, -1, 0}, {2, 0, 0}, {-1, 0, 0}, {-1, -1, 0}}; //追击无人机位置
 
-const int BATTERY_THRESHOLD = 45;
+const int BATTERY_THRESHOLD = 30;
 const int FULL_BATTERY = 100;

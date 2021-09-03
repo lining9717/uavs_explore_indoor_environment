@@ -3,8 +3,8 @@
 <launch>
     <node pkg="uavs_explore_indoor_environment" type="UAVsExploreIndoorEnvironment" name="start_uavs" output="screen">
         <param name="map_file" type="string" value="/maps/map_40_40.txt"/>
-        <param name="log_file_path" type="string" value="/path_log/40_40_world/three_uavs"/>
-        <param name="uav_num" type="int" value="3"/>
+        <param name="log_file_path" type="string" value="/path_log/40_40_world/two_uavs"/>
+        <param name="uav_num" type="int" value="2"/>
     </node>
 
     <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find uavs_explore_indoor_environment)/rviz_cfg/four_rviz_config.rviz"/> -->
