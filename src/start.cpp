@@ -3,6 +3,12 @@
 std::mutex tracking_uav_index_mutex;
 int sequence_take_off = 1;
 
+//网格地图路径
+std::string map_file_path;
+int NUM_OF_UAV;
+std::vector<Position> init_uavs_positons;      //初始无人机位置
+std::vector<Position> tracking_uavs_positions; //追击无人机位置
+
 // 获取被追踪无人机uav id
 int getPreUAVId(TheardSafe *thread_safe)
 {
@@ -107,7 +113,7 @@ void simulation::Simulation::startUAVCallback(int id)
 {
     printf("Start [UAV%d]\n", id);
     UAVPtr curr_uav = uavs[id];
-    curr_uav->setStopPosition(end_position);
+    // curr_uav->setStopPosition(end_position);
     curr_uav->initForDrive();
     curr_uav->wallAround(wall_around_planners[id]);
 }
@@ -136,10 +142,6 @@ int simulation::Simulation::getNextTrackingUAVId(int pre_uav_id)
     if (last_sequence_take_off != sequence_take_off)
         sleep(3);
     return ret;
-    // int ret = tracking_uavs_index;
-    // ++tracking_uavs_index;
-    // ++sequence_take_off;
-    // return ret;
 }
 
 void simulation::Simulation::obstacleMapCallback()
@@ -278,7 +280,7 @@ void simulation::Simulation::trackingUAVCallback()
     printf("UAV%d catch UAV%d\n", curr_uav_id, pre_uav_id);
     UAVPtr curr_uav = uavs[curr_uav_id];
     curr_uav->setEntranceStopPosition(uavs[pre_uav_id]->getEntranceStopPosition());
-    curr_uav->setStopPosition(end_position);
+    // curr_uav->setStopPosition(end_position);
 
     Node start_position{getColFromX(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].x)),
                         getRowFromY(int(tracking_uavs_positions[curr_uav_id - NUM_OF_UAV].y))};
@@ -322,6 +324,57 @@ void simulation::Simulation::start()
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "uavs_simulation");
+    std::string path = ros::package::getPath("uavs_explore_indoor_environment");
+    std::cout << path << std::endl;
+    std::string temp_map_file;
+    std::string init_positions_file_path;
+    std::string track_positions_file_path;
+
+    if (ros::param::get("~map_file", temp_map_file))
+        map_file_path = path + temp_map_file;
+    else
+        map_file_path = path + "/maps/map.txt";
+
+    if (ros::param::get("~init_positions", init_positions_file_path))
+        init_positions_file_path = path + init_positions_file_path;
+    else
+        init_positions_file_path = path + "/positions/map.txt";
+
+    if (ros::param::get("~track_positions", track_positions_file_path))
+        track_positions_file_path = path + track_positions_file_path;
+    else
+        track_positions_file_path = path + "/positions/map.txt";
+
+    std::cout << "map_file:" << map_file_path << std::endl;
+    std::cout << "init positions:" << init_positions_file_path << std::endl;
+    std::cout << "track positions:" << track_positions_file_path << std::endl;
+
+    std::ifstream init_positions_file(init_positions_file_path);
+    std::string input;
+    std::cout << "init positions:" << std::endl;
+    while (init_positions_file >> input)
+    {
+        int pos = input.find(',');
+        int x = atoi(input.substr(0, pos).c_str());
+        int y = atoi(input.substr(pos + 1).c_str());
+        init_uavs_positons.push_back({x, y, 0});
+        std::cout << "(" << x << ", " << y << ")" << std::endl;
+    }
+    std::cout << std::endl
+              << "track positions:" << std::endl;
+    std::ifstream track_positions_file(track_positions_file_path);
+    while (track_positions_file >> input)
+    {
+        int pos = input.find(',');
+        int x = atoi(input.substr(0, pos).c_str());
+        int y = atoi(input.substr(pos + 1).c_str());
+        tracking_uavs_positions.push_back({x, y, 0});
+        std::cout << "(" << x << ", " << y << ")" << std::endl;
+    }
+
+    NUM_OF_UAV = init_uavs_positons.size();
+    std::cout << "NUM_OF_UAV:" << NUM_OF_UAV << std::endl;
+    
     std::shared_ptr<simulation::Simulation> p_simulation = std::make_shared<simulation::Simulation>();
     p_simulation->start();
     return 0;

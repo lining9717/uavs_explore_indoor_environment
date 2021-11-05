@@ -24,6 +24,7 @@
   <build_export_depend>hector_quadrotor_gazebo</build_export_depend>
   <build_export_depend>visualization_msgs</build_export_depend>
   <build_export_depend>tf</build_export_depend>
+  <build_depend>roslib</build_depend>
 
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
@@ -34,5 +35,6 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>roslib</exec_depend>
 
 </package>

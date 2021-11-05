@@ -13,7 +13,8 @@ find_package(
              message_generation
              tf
              std_msgs
-             visualization_msgs)
+             visualization_msgs
+             roslib)
 
 add_service_files(FILES EnableMotors.srv TrackingUAVId.srv)
 
@@ -28,7 +29,8 @@ catkin_package(
   hector_quadrotor_gazebo
   geometry_msgs
   roscpp
-  std_msgs)
+  std_msgs
+  roslib)
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 

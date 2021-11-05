@@ -1,5 +1,8 @@
 #include "uav.h"
 
+//网格地图路径
+extern int NUM_OF_UAV;
+
 void sendUAVId(TheardSafe *thread_safe, int id)
 {
     // printf("sendUAVId thread_safe address: %p\n", thread_safe);
@@ -608,12 +611,12 @@ void UAV::UAV::wallAround(const WallAroundPlannerPtr &planner)
                 state = IDLE;
                 break;
             }
-            if (m_stop_postion_ == m_uav_real_position_)
-            {
-                printf("[UAV%d]  Finish by m_stop_postion_!\n", m_id_);
-                state = IDLE;
-                break;
-            }
+            // if (m_stop_postion_ == m_uav_real_position_)
+            // {
+            //     printf("[UAV%d]  Finish by m_stop_postion_!\n", m_id_);
+            //     state = IDLE;
+            //     break;
+            // }
             if (is_initial) // 起飞时进行初始化，导向最近的边界，并确定主方向
             {
                 Direction towads_direction = planner->getMainDirection();

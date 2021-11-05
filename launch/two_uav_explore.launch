@@ -41,7 +41,7 @@
   </group>
 
 
-    <!-- Spawn simulated quadrotor uav -->
+  <!-- Spawn simulated quadrotor uav -->
   <group ns="uav2">
     <include file="$(find hector_quadrotor_gazebo)/launch/spawn_quadrotor.launch">
       <arg name="name" value="uav2" />
@@ -73,5 +73,4 @@
                 "/>
     </include>
   </group>
-
 </launch>
