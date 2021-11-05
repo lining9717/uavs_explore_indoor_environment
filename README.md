@@ -1,13 +1,13 @@
 ### Introduction
 
-This project is a simulation implementation of the paper(**Multi-UAV Cooperative Exploring for the Unknown Indoor Environment Based on Dynamic Target Tracking**) .
+This project is a simulation implementation of the paper(Multi-UAV Cooperative Exploring for the Unknown Indoor Environment Based on Dynamic Target Tracking) .
 
 
 
 ### Requirements
 
 - Ubuntu16.04 + ROS kinetic
-- Install [hector_quadrotor](http://wiki.ros.org/action/fullsearch/hector_quadrotor?action=fullsearch&context=180&value=linkto%3A"hector_quadrotor") follow by https://darienmt.com/autonomous-flight/2018/10/20/flying-ros-and-hector.html
+- Install [hector_quadrotor](http://wiki.ros.org/action/fullsearch/hector_quadrotor?action=fullsearch&context=180&value=linkto%3A"hector_quadrotor") follow by [here](https://darienmt.com/autonomous-flight/2018/10/20/flying-ros-and-hector.html)
 
 
 
